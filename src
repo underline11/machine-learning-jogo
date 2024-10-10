@@ -1,0 +1,288 @@
+import pygame
+import random
+
+# Inicializando o Pygame
+pygame.init()
+pygame.font.init()  # Inicializa o sistema de fontes do Pygame
+
+# Definindo as cores
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
+RED = (255, 0, 0)
+
+# Dimensões da janela
+WIDTH = 400
+HEIGHT = 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption('Flappy Bird')
+
+# Definindo o FPS (frames por segundo)
+FPS = 60
+clock = pygame.time.Clock()
+
+# Definindo as variáveis do jogo
+bird_width = 40
+bird_height = 30
+bird_x = 50
+bird_y = HEIGHT // 2
+bird_velocity = 0
+gravity = 0.4
+jump = -10
+
+pipe_width = 70
+pipe_gap = 150
+pipe_velocity = -4
+
+meteor_width = 40
+meteor_height = 40
+
+shield_width = 40
+shield_height = 40
+
+coin_width = 20
+coin_height = 20
+
+score = 0
+game_over = False
+game_started = False  # Controla se o jogo já foi iniciado
+has_shield = False  # Controla se o jogador tem escudo ativo
+
+# Carregar a imagem do cano
+pipe_image = pygame.image.load("C:\\Users\\Aluno\\Documents\\fillipe\\cano3.PNG")
+pipe_image = pygame.transform.scale(pipe_image, (pipe_width, HEIGHT))  # Redimensionar a imagem do cano
+
+# Função para gerar novos canos
+def create_pipe():
+    pipe_height = random.randint(150, HEIGHT - 200)
+    pipe = {'x': WIDTH, 'height': pipe_height}
+    return pipe
+
+# Função para gerar meteoros
+def create_meteor():
+    meteor_x = random.randint(0, WIDTH - meteor_width)
+    meteor_y = 0  # O meteoro começa a cair do topo da tela
+    return {'x': meteor_x, 'y': meteor_y}
+
+# Função para gerar moedas
+def create_coin():
+    coin_x = WIDTH
+    coin_y = random.randint(50, HEIGHT - 50)
+    return {'x': coin_x, 'y': coin_y}
+
+# Função para gerar escudos
+def create_shield():
+    shield_x = WIDTH
+    shield_y = random.randint(50, HEIGHT - 50)
+    return {'x': shield_x, 'y': shield_y}
+
+# Função para desenhar o pássaro
+def draw_bird():
+    pygame.draw.rect(screen, BLUE, [bird_x, bird_y, bird_width, bird_height])
+
+# Função para desenhar os canos
+def draw_pipe(pipe):
+    # Desenha a imagem do cano na posição correta
+    screen.blit(pipe_image, (pipe['x'], 0), (0, 0, pipe_width, pipe['height']))  # Canos superiores
+    screen.blit(pipe_image, (pipe['x'], pipe['height'] + pipe_gap), (0, 0, pipe_width, HEIGHT))  # Canos inferiores
+
+# Função para desenhar meteoros
+def draw_meteor(meteor):
+    pygame.draw.rect(screen, RED, [meteor['x'], meteor['y'], meteor_width, meteor_height])
+
+# Função para desenhar moedas
+def draw_coin(coin):
+    pygame.draw.rect(screen, YELLOW, [coin['x'], coin['y'], coin_width, coin_height])
+
+# Função para desenhar escudos
+def draw_shield(shield):
+    pygame.draw.rect(screen, BLACK, [shield['x'], shield['y'], shield_width, shield_height])
+
+# Função para verificar colisão com canos
+def check_collision(pipe):
+    if (bird_x + bird_width > pipe['x'] and bird_x < pipe['x'] + pipe_width):
+        if (bird_y < pipe['height'] or bird_y + bird_height > pipe['height'] + pipe_gap):
+            return True
+    if bird_y + bird_height > HEIGHT or bird_y < 0:
+        return True
+    return False
+
+# Função para verificar colisão com meteoros
+def check_meteor_collision(meteor):
+    if (bird_x + bird_width > meteor['x'] and bird_x < meteor['x'] + meteor_width and
+        bird_y + bird_height > meteor['y'] and bird_y < meteor['y'] + meteor_height):
+        return True
+    return False
+
+# Função para verificar colisão com moedas
+def check_coin_collision(coin):
+    if (bird_x + bird_width > coin['x'] and bird_x < coin['x'] + coin_width and
+        bird_y + bird_height > coin['y'] and bird_y < coin['y'] + coin_height):
+        return True
+    return False
+
+# Função para verificar colisão com escudos
+def check_shield_collision(shield):
+    if (bird_x + bird_width > shield['x'] and bird_x < shield['x'] + shield_width and
+        bird_y + bird_height > shield['y'] and bird_y < shield['y'] + shield_height):
+        return True
+    return False
+
+# Função para exibir as instruções iniciais
+def show_instructions():
+    screen.fill(WHITE)
+    font = pygame.font.SysFont(None, 50)
+    title_text = font.render('Flappy Bird', True, BLACK)
+    screen.blit(title_text, [WIDTH // 4, HEIGHT // 4])
+
+    font = pygame.font.SysFont(None, 35)
+    instructions_text1 = font.render('Press SPACE to jump', True, BLACK)
+    instructions_text2 = font.render('Avoid the pipes', True, BLACK)
+    instructions_text3 = font.render('Press ENTER to start', True, BLACK)
+    screen.blit(instructions_text1, [WIDTH // 6, HEIGHT // 2])
+    screen.blit(instructions_text2, [WIDTH // 4, HEIGHT // 2 + 40])
+    screen.blit(instructions_text3, [WIDTH // 5, HEIGHT // 2 + 80])
+
+    pygame.display.update()
+
+# Função principal do jogo
+def game():
+    global bird_y, bird_velocity, score, game_over, game_started, has_shield
+
+    pipes = [create_pipe()]
+    meteors = []
+    coins = []
+    shields = []
+
+    # Exibir a tela de instruções antes do jogo começar
+    while not game_started:
+        show_instructions()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    game_started = True  # Inicia o jogo quando ENTER é pressionado
+
+    while True:
+        screen.fill(WHITE)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE and not game_over:
+                    bird_velocity = jump  # Faz o pássaro subir ao pressionar espaço
+                if event.key == pygame.K_r and game_over:
+                    game_over = False
+                    bird_y = HEIGHT // 2
+                    bird_velocity = 0
+                    pipes.clear()
+                    pipes.append(create_pipe())
+                    meteors.clear()  # Reiniciar meteoros quando o jogo for reiniciado
+                    coins.clear()
+                    shields.clear()
+                    score = 0
+                    has_shield = False
+
+        if not game_over:
+            bird_velocity += gravity
+            bird_y += bird_velocity
+
+            # Movendo e gerando canos
+            for pipe in pipes:
+                pipe['x'] += pipe_velocity
+                if pipe['x'] < -pipe_width:
+                    pipes.remove(pipe)
+                    pipes.append(create_pipe())
+                    score += 1
+
+            # Gerando e movendo meteoros
+            if random.randint(0, 100) < 2:  # 2% de chance de gerar meteoro
+                meteors.append(create_meteor())
+            for meteor in meteors:
+                meteor['y'] += 5  # Velocidade de queda dos meteoros
+                if meteor['y'] > HEIGHT:
+                    meteors.remove(meteor)
+
+            # Gerando e movendo moedas
+            if random.randint(0, 100) < 2:  # 2% de chance de gerar moeda
+                coins.append(create_coin())
+            for coin in coins:
+                coin['x'] += pipe_velocity
+                if coin['x'] < -coin_width:
+                    coins.remove(coin)
+
+            # Gerando e movendo escudos
+            if random.randint(0, 100) < 1:  # 1% de chance de gerar escudo
+                shields.append(create_shield())
+            for shield in shields:
+                shield['x'] += pipe_velocity
+                if shield['x'] < -shield_width:
+                    shields.remove(shield)
+
+            # Verificando colisões com canos
+            for pipe in pipes:
+                if check_collision(pipe):
+                    if has_shield:
+                        has_shield = False  # Usar o escudo para evitar a colisão
+                    else:
+                        game_over = True
+
+            # Verificando colisões com meteoros
+            for meteor in meteors:
+                if check_meteor_collision(meteor):
+                    if has_shield:
+                        has_shield = False  # Usar o escudo para evitar a colisão
+                    else:
+                        game_over = True
+
+            # Verificando colisões com moedas
+            for coin in coins:
+                if check_coin_collision(coin):
+                    coins.remove(coin)
+                    score += 5  # Adiciona 5 ao score ao pegar uma moeda
+
+            # Verificando colisões com escudos
+            for shield in shields:
+                if check_shield_collision(shield):
+                    shields.remove(shield)
+                    has_shield = True  # Ativa o escudo
+
+            # Desenhando pássaro, canos, meteoros, moedas e escudos
+            draw_bird()
+            for pipe in pipes:
+                draw_pipe(pipe)
+            for meteor in meteors:
+                draw_meteor(meteor)
+            for coin in coins:
+                draw_coin(coin)
+            for shield in shields:
+                draw_shield(shield)
+
+            # Exibir o score
+            font = pygame.font.SysFont(None, 35)
+            score_text = font.render('Score: ' + str(score), True, BLACK)
+            screen.blit(score_text, [10, 10])
+
+            # Exibir escudo ativo
+            if has_shield:
+                shield_text = font.render('Shield Active!', True, BLACK)
+                screen.blit(shield_text, [10, 40])
+
+        else:
+            font = pygame.font.SysFont(None, 50)
+            game_over_text = font.render('Game Over', True, BLACK)
+            restart_text = font.render('Press R to Restart', True, BLACK)
+            screen.blit(game_over_text, [WIDTH // 4, HEIGHT // 4])
+            screen.blit(restart_text, [WIDTH // 4, HEIGHT // 4 + 50])
+
+        pygame.display.update()
+        clock.tick(FPS)
+
+# Iniciar o jogo
+game()
+pygame.quit()
